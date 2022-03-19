@@ -8,12 +8,27 @@ __version__ = "0.1.0"
 __license__ = "Apache-2.0"
 
 import argparse
+import socket
+
+PORT = 80
 
 
 def main(args):
     """ Main entry point of the app """
-    print("hello world")
-    print(vars(args))
+    url = vars(args)["index_file"]
+    HOST, PATH = url.split("/", 1)  # use urllib.parse for better parsing
+    PATH = "/" + PATH
+    print(HOST,  PATH)
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.connect((HOST, PORT))
+        req = (
+            f"GET {PATH} HTTP/1.1\r\n"
+            f"Host: {HOST}\r\n"
+            "\r\n"
+        )
+        s.sendall(bytes(req, encoding="ascii"))
+        response = s.recv(4096)
+    print(response.decode())
 
 
 class ParseCredentials(argparse.Action):
