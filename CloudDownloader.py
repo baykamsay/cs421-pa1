@@ -11,6 +11,50 @@ import argparse
 import socket
 
 PORT = 80
+BUFLEN = 4096
+
+
+def read_header(s):
+    """ Read until header is finished """
+    res = b""
+    buffer = b""
+    try:
+        while not b"\r\n\r\n" in buffer:
+            buffer = s.recv(BUFLEN)
+            if not buffer:
+                break
+            else:
+                res += buffer
+    except socket.timeout:
+        pass
+    return res
+
+
+def split_header(res):
+
+    try:
+        header_end = res.index(b"\r\n\r\n") + len(b"\r\n\r\n")
+    except:
+        return res, b""
+    else:
+        return res[:header_end], res[header_end:]
+
+
+def read_body(s, start, end):
+    """ Reads from where read_header left off until the end of body """
+    res = b""
+    buffer = b""
+    length = start
+    try:
+        while length < end:
+            buffer = s.recv(BUFLEN)
+            if not buffer:
+                break
+            else:
+                res += buffer
+    except socket.timeout:
+        pass
+    return res
 
 
 def main(args):
@@ -18,7 +62,7 @@ def main(args):
     url = vars(args)["index_file"]
     HOST, PATH = url.split("/", 1)  # use urllib.parse for better parsing
     PATH = "/" + PATH
-    print(HOST,  PATH)
+
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((HOST, PORT))
         req = (
@@ -27,8 +71,12 @@ def main(args):
             "\r\n"
         )
         s.sendall(bytes(req, encoding="ascii"))
-        response = s.recv(4096)
-    print(response.decode())
+        res = read_header(s)
+        header_res, body_res = split_header(res)
+        header = header_res.decode()
+        # read content length here
+
+    print(res.decode())
 
 
 class ParseCredentials(argparse.Action):
