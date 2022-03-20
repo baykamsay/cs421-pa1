@@ -54,17 +54,21 @@ def recv_body(s, start, end_index):
     """ Reads from where recv_header left off until the end of body """
     res = start
     buffer = b""
-    length = len(start)
+    iterations = 0
     try:
-        while length < end_index:
+        while len(res) < end_index:
+            iterations += 1
             buffer = s.recv(BUFLEN)
+            # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Iteration: %r\n%s\n\n\n" %
+            #       (iterations, buffer.decode()))
             if not buffer:
                 break
             else:
                 res += buffer
-                length += BUFLEN
     except socket.timeout:
+        print("\n\n\n~~~~~~~~~~~~~TIMEOUT~~~~~~~~~~~~~\n\n\n")
         pass
+    print(iterations)
     return res
 
 
@@ -100,27 +104,23 @@ def get_all_partials(data):
     lines = data.rstrip().split("\n")
     partial_lines = lines[2:]
     partials = [partial_lines[n:n+3] for n in range(0, len(partial_lines), 3)]
-    conc = []
+    urls = []
+    creds = []
+    offsets = []
+    ends = []
     prev_end = 0
-    for index, partial in enumerate(partials):
+    for partial in partials:
         start, end = partial[2].split("-", 1)
         start, end = int(start), int(end)
-        conc.append((partial[0], partial[1], prev_end -
-                    start+1, end-start+1, index))
+        urls.append(partial[0])
+        creds.append(partial[1])
+        offsets.append(prev_end-start+1)
+        ends.append(end-start+1)
         prev_end = end
-    result = [None] * len(conc)
+
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        # mark each future with its index
-        future_to_index = {executor.submit(
-            get_partial, partial[0], partial[1], partial[2], partial[3]): partial[4] for partial in conc}
-        for future in concurrent.futures.as_completed(future_to_index):
-            index = future_to_index[future]
-            try:
-                data = future.result()
-            except Exception as exc:
-                print('%r generated an exception: %s' % (index, exc))
-            else:
-                result[index] = data
+        result = executor.map(get_partial, urls, creds, offsets, ends)
+
     return (lines[0], lines[1], result)
 
 
