@@ -14,7 +14,7 @@ PORT = 80
 BUFLEN = 4096
 
 
-def read_header(s):
+def recv_header(s):
     """ Read until header is finished """
     res = b""
     buffer = b""
@@ -31,7 +31,7 @@ def read_header(s):
 
 
 def split_header(res):
-
+    """ Split the header and the start of the body """
     try:
         header_end = res.index(b"\r\n\r\n") + len(b"\r\n\r\n")
     except:
@@ -40,9 +40,17 @@ def split_header(res):
         return res[:header_end], res[header_end:]
 
 
-def read_body(s, start, end):
-    """ Reads from where read_header left off until the end of body """
-    res = b""
+def get_content_length(header):
+    """ Gets the Content-Length from a given ascii header """
+    header = header.split("\r\n")
+    for line in header:
+        if "Content-Length" in line:
+            return int(line[line.index(":")+1:])
+
+
+def recv_body(s, body_start, start, end):
+    """ Reads from where recv_header left off until the end of body """
+    res = body_start
     buffer = b""
     length = start
     try:
@@ -71,12 +79,13 @@ def main(args):
             "\r\n"
         )
         s.sendall(bytes(req, encoding="ascii"))
-        res = read_header(s)
+        res = recv_header(s)
         header_res, body_res = split_header(res)
         header = header_res.decode()
-        # read content length here
-
-    print(res.decode())
+        body_res = recv_body(s, body_res, len(header_res),
+                             get_content_length(header))
+        body = body_res.decode()
+        print(body)
 
 
 class ParseCredentials(argparse.Action):
