@@ -67,7 +67,7 @@ def recv_body(s, body_start, start, end):
     return res
 
 
-def get_partial(url, cred, offset):
+def get_partial(url, cred, offset, end):
     """
     Requests a partial txt file and returns the start-end portion of the body
     """
@@ -91,7 +91,7 @@ def get_partial(url, cred, offset):
                              get_content_length(header))
     # print("~~~~~~~~~~~~~~~~~~~~~~~~~~ %r ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n %r\n" % (
     #     url, body_res[offset:].decode()))
-    return body_res[offset:]
+    return body_res[offset:end]
 
 
 def get_all_partials(data):
@@ -103,17 +103,18 @@ def get_all_partials(data):
     partial_lines = lines[2:]
     partials = [partial_lines[n:n+3] for n in range(0, len(partial_lines), 3)]
     conc = []
-    prev_end = 1
+    prev_end = 0
     for index, partial in enumerate(partials):
         start, end = partial[2].split("-", 1)
         start, end = int(start), int(end)
-        conc.append((partial[0], partial[1], prev_end-start, index))
+        conc.append((partial[0], partial[1], prev_end -
+                    start+1, end-start+1, index))
         prev_end = end
     result = [None] * len(conc)
     with concurrent.futures.ThreadPoolExecutor() as executor:
         # mark each future with its index
         future_to_index = {executor.submit(
-            get_partial, partial[0], partial[1], partial[2]): partial[3] for partial in conc}
+            get_partial, partial[0], partial[1], partial[2], partial[3]): partial[4] for partial in conc}
         for future in concurrent.futures.as_completed(future_to_index):
             index = future_to_index[future]
             try:
