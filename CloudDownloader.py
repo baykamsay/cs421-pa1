@@ -50,13 +50,13 @@ def get_content_length(header):
             return int(line[line.index(":")+1:])
 
 
-def recv_body(s, body_start, start, end):
+def recv_body(s, start, end_index):
     """ Reads from where recv_header left off until the end of body """
-    res = body_start
+    res = start
     buffer = b""
-    length = start
+    iterations = 0
     try:
-        while length < end:
+        while len(res) < end_index:
             buffer = s.recv(BUFLEN)
             if not buffer:
                 break
@@ -85,12 +85,9 @@ def get_partial(url, cred, offset, end):
         )
         s.sendall(bytes(req, encoding="ascii"))
         res = recv_header(s)
-        header_res, body_res = split_header(res)
+        header_res, body_start = split_header(res)
         header = header_res.decode()
-        body_res = recv_body(s, body_res, len(header_res),
-                             get_content_length(header))
-    # print("~~~~~~~~~~~~~~~~~~~~~~~~~~ %r ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n %r\n" % (
-    #     url, body_res[offset:].decode()))
+        body_res = recv_body(s, body_start, get_content_length(header))
     return body_res[offset:end]
 
 
@@ -102,32 +99,28 @@ def get_all_partials(data):
     lines = data.rstrip().split("\n")
     partial_lines = lines[2:]
     partials = [partial_lines[n:n+3] for n in range(0, len(partial_lines), 3)]
-    conc = []
+    urls = []
+    creds = []
+    offsets = []
+    ends = []
     prev_end = 0
-    for index, partial in enumerate(partials):
+    for partial in partials:
         start, end = partial[2].split("-", 1)
         start, end = int(start), int(end)
-        conc.append((partial[0], partial[1], prev_end -
-                    start+1, end-start+1, index))
+        urls.append(partial[0])
+        creds.append(partial[1])
+        offsets.append(prev_end-start+1)
+        ends.append(end-start+1)
         prev_end = end
-    result = [None] * len(conc)
+
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        # mark each future with its index
-        future_to_index = {executor.submit(
-            get_partial, partial[0], partial[1], partial[2], partial[3]): partial[4] for partial in conc}
-        for future in concurrent.futures.as_completed(future_to_index):
-            index = future_to_index[future]
-            try:
-                data = future.result()
-            except Exception as exc:
-                print('%r generated an exception: %s' % (index, exc))
-            else:
-                result[index] = data
+        result = executor.map(get_partial, urls, creds, offsets, ends)
+
     return (lines[0], lines[1], result)
 
 
 def main(args):
-    """ Main entry point of the app """
+    """ Main entry point """
     url = vars(args)["index_file"]
     HOST, PATH = url.split("/", 1)  # use urllib.parse for better parsing
     PATH = "/" + PATH
@@ -144,14 +137,13 @@ def main(args):
         )
         s.sendall(bytes(req, encoding="ascii"))
         res = recv_header(s)
-        header_res, body_res = split_header(res)
+        header_res, body_start = split_header(res)
         header = header_res.decode()
-        body_res = recv_body(s, body_res, len(header_res),
-                             get_content_length(header))
+        body_res = recv_body(s, body_start, get_content_length(header))
     body = body_res.decode()
     filename, filesize, data = get_all_partials(body)
     result_string = (b"".join(data)).decode()
-    with open(filename, "w") as result_file:
+    with open(filename, "w+") as result_file:
         result_file.write(result_string)
 
 
