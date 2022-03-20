@@ -8,8 +8,8 @@ __version__ = "0.1.0"
 __license__ = "Apache-2.0"
 
 import argparse
-import asyncio
 import base64
+import concurrent.futures
 import socket
 
 PORT = 80
@@ -67,11 +67,12 @@ def recv_body(s, body_start, start, end):
     return res
 
 
-async def get_partial(url, cred, offset):
+def get_partial(url, cred, offset):
     """
     Requests a partial txt file and returns the start-end portion of the body
     """
-    HOST, PATH = url.split("/", 1)
+    HOST, PATH = url.rstrip().split("/", 1)
+    PATH = "/" + PATH
     credentials = str(base64.b64encode(
         bytes(cred, encoding="ascii")), encoding="ascii")
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -91,25 +92,35 @@ async def get_partial(url, cred, offset):
     return body_res[offset:]
 
 
-async def get_all_partials(data):
+def get_all_partials(data):
     """
     Requests all partial txt files in the given data returns the resulting text 
-    file name, size, and partials in a dictionary
+    file name, size, and partials
     """
     lines = data.rstrip().split("\n")
     partial_lines = lines[2:]
     partials = [partial_lines[n:n+3] for n in range(0, len(partial_lines), 3)]
-    concurrent = []
+    conc = []
     prev_end = 0
-    for partial in partials:
-        start, end = partial[2].split("-")
+    for index, partial in enumerate(partials):
+        start, end = partial[2].split("-", 1)
         start, end = int(start), int(end)
-        concurrent.append(get_partial(partial[0], partial[1], prev_end-start))
+        conc.append((partial[0], partial[1], prev_end-start, index))
         prev_end = end
-    result = await asyncio.gather(
-        *concurrent
-    )
-    print(result)
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        # mark each future with its index
+        future_to_index = {executor.submit(
+            get_partial, partial[0], partial[1], partial[2]): partial[3] for partial in conc}
+        for future in concurrent.futures.as_completed(future_to_index):
+            index = future_to_index[future]
+            try:
+                data = future.result()
+            except Exception as exc:
+                print('%r generated an exception: %s' % (index, exc))
+            else:
+                print('Partial %r:\n%r\n' % (index, data.decode()))
+
     return (lines[0], lines[1])
 
 
@@ -136,7 +147,7 @@ def main(args):
         body_res = recv_body(s, body_res, len(header_res),
                              get_content_length(header))
     body = body_res.decode()
-    filename, filesize = asyncio.run(get_all_partials(body))
+    filename, filesize = get_all_partials(body)
     print(filename)
 
 
