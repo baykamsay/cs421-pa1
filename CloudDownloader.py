@@ -57,18 +57,13 @@ def recv_body(s, start, end_index):
     iterations = 0
     try:
         while len(res) < end_index:
-            iterations += 1
             buffer = s.recv(BUFLEN)
-            # print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Iteration: %r\n%s\n\n\n" %
-            #       (iterations, buffer.decode()))
             if not buffer:
                 break
             else:
                 res += buffer
     except socket.timeout:
-        print("\n\n\n~~~~~~~~~~~~~TIMEOUT~~~~~~~~~~~~~\n\n\n")
         pass
-    print(iterations)
     return res
 
 
