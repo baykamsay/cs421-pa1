@@ -154,3 +154,5 @@ cython_debug/
 # test files
 Target1.txt
 Test1.txt
+Target2.txt
+Test2.txt
