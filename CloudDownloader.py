@@ -50,18 +50,19 @@ def get_content_length(header):
             return int(line[line.index(":")+1:])
 
 
-def recv_body(s, body_start, start, end):
+def recv_body(s, start, end_index):
     """ Reads from where recv_header left off until the end of body """
-    res = body_start
+    res = start
     buffer = b""
-    length = start
+    length = len(start)
     try:
-        while length < end:
+        while length < end_index:
             buffer = s.recv(BUFLEN)
             if not buffer:
                 break
             else:
                 res += buffer
+                length += BUFLEN
     except socket.timeout:
         pass
     return res
@@ -85,12 +86,9 @@ def get_partial(url, cred, offset, end):
         )
         s.sendall(bytes(req, encoding="ascii"))
         res = recv_header(s)
-        header_res, body_res = split_header(res)
+        header_res, body_start = split_header(res)
         header = header_res.decode()
-        body_res = recv_body(s, body_res, len(header_res),
-                             get_content_length(header))
-    # print("~~~~~~~~~~~~~~~~~~~~~~~~~~ %r ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n %r\n" % (
-    #     url, body_res[offset:].decode()))
+        body_res = recv_body(s, body_start, get_content_length(header))
     return body_res[offset:end]
 
 
@@ -127,7 +125,7 @@ def get_all_partials(data):
 
 
 def main(args):
-    """ Main entry point of the app """
+    """ Main entry point """
     url = vars(args)["index_file"]
     HOST, PATH = url.split("/", 1)  # use urllib.parse for better parsing
     PATH = "/" + PATH
@@ -144,14 +142,13 @@ def main(args):
         )
         s.sendall(bytes(req, encoding="ascii"))
         res = recv_header(s)
-        header_res, body_res = split_header(res)
+        header_res, body_start = split_header(res)
         header = header_res.decode()
-        body_res = recv_body(s, body_res, len(header_res),
-                             get_content_length(header))
+        body_res = recv_body(s, body_start, get_content_length(header))
     body = body_res.decode()
     filename, filesize, data = get_all_partials(body)
     result_string = (b"".join(data)).decode()
-    with open(filename, "w") as result_file:
+    with open(filename, "w+") as result_file:
         result_file.write(result_string)
 
 
