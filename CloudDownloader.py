@@ -11,6 +11,7 @@ import argparse
 import base64
 import concurrent.futures
 import socket
+import sys
 
 PORT = 80
 BUFLEN = 4096
@@ -45,6 +46,9 @@ def split_header(res):
 def get_content_length(header):
     """ Gets the Content-Length from a given ascii header """
     header = header.split("\r\n")
+    status = int(header[0].split(" ")[1])
+    if status != 200:  # give error if status message is not 200
+        sys.exit("Error: %s, quitting..." % header[0].split(" ", 1)[1])
     for line in header:
         if "Content-Length" in line:
             return int(line[line.index(":")+1:])
@@ -120,7 +124,7 @@ def get_all_partials(data):
 
 
 def main(args):
-    """ Main entry point """
+    """ Program start """
     url = vars(args)["index_file"]
     HOST, PATH = url.split("/", 1)  # use urllib.parse for better parsing
     PATH = "/" + PATH
