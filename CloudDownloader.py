@@ -8,6 +8,7 @@ __version__ = "0.1.0"
 __license__ = "Apache-2.0"
 
 import argparse
+import asyncio
 import base64
 import socket
 
@@ -66,6 +67,31 @@ def recv_body(s, body_start, start, end):
     return res
 
 
+async def get_partial(url, credentials, offset):
+    """ Requests a partial txt file and returns the start-end portion of the body """
+
+
+async def async_test(i):
+    await asyncio.sleep(1)
+    return i
+
+
+async def get_all_partials(data):
+    """
+    Requests all partial txt files in the given data returns the resulting text file name, size, and 
+    partials in a dictionary
+    """
+    lines = data.split("\n")
+
+    concurrent = [async_test(1), async_test(2), async_test(3)]
+    result = await asyncio.gather(
+        *concurrent
+    )
+    print(result)
+
+    return (lines[0], lines[1])
+
+
 def main(args):
     """ Main entry point of the app """
     url = vars(args)["index_file"]
@@ -88,8 +114,9 @@ def main(args):
         header = header_res.decode()
         body_res = recv_body(s, body_res, len(header_res),
                              get_content_length(header))
-        body = body_res.decode()
-        print(body)
+    body = body_res.decode()
+    filename, filesize = asyncio.run(get_all_partials(body))
+    print(filename)
 
 
 if __name__ == "__main__":
