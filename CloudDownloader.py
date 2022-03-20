@@ -67,28 +67,49 @@ def recv_body(s, body_start, start, end):
     return res
 
 
-async def get_partial(url, credentials, offset):
-    """ Requests a partial txt file and returns the start-end portion of the body """
-
-
-async def async_test(i):
-    await asyncio.sleep(1)
-    return i
+async def get_partial(url, cred, offset):
+    """
+    Requests a partial txt file and returns the start-end portion of the body
+    """
+    HOST, PATH = url.split("/", 1)
+    credentials = str(base64.b64encode(
+        bytes(cred, encoding="ascii")), encoding="ascii")
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.connect((HOST, PORT))
+        req = (
+            f"GET {PATH} HTTP/1.1\r\n"
+            f"Host: {HOST}\r\n"
+            f"Authorization: Basic {credentials}\r\n"
+            "\r\n"
+        )
+        s.sendall(bytes(req, encoding="ascii"))
+        res = recv_header(s)
+        header_res, body_res = split_header(res)
+        header = header_res.decode()
+        body_res = recv_body(s, body_res, len(header_res),
+                             get_content_length(header))
+    return body_res[offset:]
 
 
 async def get_all_partials(data):
     """
-    Requests all partial txt files in the given data returns the resulting text file name, size, and 
-    partials in a dictionary
+    Requests all partial txt files in the given data returns the resulting text 
+    file name, size, and partials in a dictionary
     """
-    lines = data.split("\n")
-
-    concurrent = [async_test(1), async_test(2), async_test(3)]
+    lines = data.rstrip().split("\n")
+    partial_lines = lines[2:]
+    partials = [partial_lines[n:n+3] for n in range(0, len(partial_lines), 3)]
+    concurrent = []
+    prev_end = 0
+    for partial in partials:
+        start, end = partial[2].split("-")
+        start, end = int(start), int(end)
+        concurrent.append(get_partial(partial[0], partial[1], prev_end-start))
+        prev_end = end
     result = await asyncio.gather(
         *concurrent
     )
     print(result)
-
     return (lines[0], lines[1])
 
 
