@@ -89,6 +89,8 @@ def get_partial(url, cred, offset):
         header = header_res.decode()
         body_res = recv_body(s, body_res, len(header_res),
                              get_content_length(header))
+    # print("~~~~~~~~~~~~~~~~~~~~~~~~~~ %r ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n %r\n" % (
+    #     url, body_res[offset:].decode()))
     return body_res[offset:]
 
 
@@ -101,13 +103,13 @@ def get_all_partials(data):
     partial_lines = lines[2:]
     partials = [partial_lines[n:n+3] for n in range(0, len(partial_lines), 3)]
     conc = []
-    prev_end = 0
+    prev_end = 1
     for index, partial in enumerate(partials):
         start, end = partial[2].split("-", 1)
         start, end = int(start), int(end)
         conc.append((partial[0], partial[1], prev_end-start, index))
         prev_end = end
-
+    result = [None] * len(conc)
     with concurrent.futures.ThreadPoolExecutor() as executor:
         # mark each future with its index
         future_to_index = {executor.submit(
@@ -119,9 +121,8 @@ def get_all_partials(data):
             except Exception as exc:
                 print('%r generated an exception: %s' % (index, exc))
             else:
-                print('Partial %r:\n%r\n' % (index, data.decode()))
-
-    return (lines[0], lines[1])
+                result[index] = data
+    return (lines[0], lines[1], result)
 
 
 def main(args):
@@ -147,8 +148,10 @@ def main(args):
         body_res = recv_body(s, body_res, len(header_res),
                              get_content_length(header))
     body = body_res.decode()
-    filename, filesize = get_all_partials(body)
-    print(filename)
+    filename, filesize, data = get_all_partials(body)
+    result_string = (b"".join(data)).decode()
+    with open(filename, "w") as result_file:
+        result_file.write(result_string)
 
 
 if __name__ == "__main__":
