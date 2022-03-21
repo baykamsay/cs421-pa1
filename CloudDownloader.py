@@ -174,7 +174,7 @@ if __name__ == "__main__":
         "username:password", help="The authentication information of the index server, in the structure <username>:<password>")
 
     # Multithreading flag
-    parser.add_argument("-m", "--multi", action="store_true", default=False)
+    parser.add_argument("-m", "--multi", action="store_true", default=False, help="Run the program in multithreading mode")
 
     # Specify output of "--version"
     parser.add_argument(
