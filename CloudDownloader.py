@@ -93,7 +93,8 @@ def get_partial(url, cred, offset, end, byte_range):
         header_res, body_start = split_header(res)
         header = header_res.decode()
         body_res = recv_body(s, body_start, get_content_length(header))
-        print("Downloaded bytes %r to %r (size = %r)" % (byte_range[0]+offset, byte_range[1], end-offset))
+        print("Downloaded bytes %r to %r (size = %r)" % (byte_range[0]+offset, 
+                                                    byte_range[1], end-offset))
     return body_res[offset:end]
 
 
@@ -125,7 +126,14 @@ def get_all_partials(data, multi):
         prev_end = end
     if multi:
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            result = executor.map(get_partial, urls, creds, offsets, ends, ranges)
+            result = executor.map(
+                get_partial,
+                urls,
+                creds,
+                offsets,
+                ends,
+                ranges
+            )
     else:
         result = map(get_partial, urls, creds, offsets, ends, ranges)
 
@@ -138,8 +146,13 @@ def main(args):
     print("URL of the index file: %s" % url) # print the url
     HOST, PATH = url.split("/", 1)  # use urllib.parse for better parsing
     PATH = "/" + PATH
-    credentials = str(base64.b64encode(
-        bytes(vars(args)["username:password"], encoding="ascii")), encoding="ascii")
+    credentials = str(
+        base64.b64encode(
+            bytes(vars(args)["username:password"],
+            encoding="ascii")
+        ),
+        encoding="ascii"
+    )
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((HOST, PORT))
@@ -168,13 +181,24 @@ if __name__ == "__main__":
 
     # Required positional arguments
     parser.add_argument(
-        "index_file", help="The URL of the index that includes the list of partial file locations and their authentication information")
+        "index_file", help=(
+            "The URL of the index that includes the list of partial file "
+            "locations and their authentication information"
+        ))
 
     parser.add_argument(
-        "username:password", help="The authentication information of the index server, in the structure <username>:<password>")
+        "username:password", help=(
+            "The authentication information of the index server, in the "
+            "structure <username>:<password>"
+        ))
 
     # Multithreading flag
-    parser.add_argument("-m", "--multi", action="store_true", default=False, help="Run the program in multithreading mode")
+    parser.add_argument(
+        "-m",
+        "--multi",
+        action="store_true",
+        default=False,
+        help="Run the program in multithreading mode")
 
     # Specify output of "--version"
     parser.add_argument(
