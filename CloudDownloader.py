@@ -4,7 +4,7 @@ Cloud Downloader
 """
 
 __author__ = "Baykam Say"
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 __license__ = "Apache-2.0"
 
 import argparse
@@ -52,6 +52,7 @@ def get_content_length(header):
     for line in header:
         if "Content-Length" in line:
             return int(line[line.index(":")+1:])
+    return float("inf")  # if no content-lenght, recieve message until timeout
 
 
 def recv_body(s, start, end_index):
@@ -89,12 +90,14 @@ def get_partial(url, cred, offset, end, byte_range):
         )
         s.sendall(bytes(req, encoding="ascii"))
         res = recv_header(s)
-        print("Connected to %s" % url) # print selected url, might be out of order because of threading
+        # print selected url, might be out of order because of threading
+        print("Connected to %s" % url)
         header_res, body_start = split_header(res)
         header = header_res.decode()
         body_res = recv_body(s, body_start, get_content_length(header))
-        print("Downloaded bytes %r to %r (size = %r)" % (byte_range[0]+offset, 
-                                                    byte_range[1], end-offset))
+        print("Downloaded bytes %r to %r (size = %r)" % (byte_range[0]+offset,
+                                                         byte_range[1],
+                                                         end-offset))
     return body_res[offset:end]
 
 
@@ -104,11 +107,13 @@ def get_all_partials(data, multi):
     file name, size, and partials
     """
     lines = data.rstrip().split("\n")
-    print("File size is %s Bytes" % lines[1]) # print file size
-    print("Index file is downloaded") # printed here according to the given example
+    print("File size is %s Bytes" % lines[1])  # print file size
+    # printed here according to the given example
+    print("Index file is downloaded")
     partial_lines = lines[2:]
     partials = [partial_lines[n:n+3] for n in range(0, len(partial_lines), 3)]
-    print("There are %r servers in the index" % len(partials)) # print number of partial urls
+    print("There are %r servers in the index" %
+          len(partials))  # print number of partial urls
     urls = []
     creds = []
     offsets = []
@@ -143,13 +148,13 @@ def get_all_partials(data, multi):
 def main(args):
     """ Program start """
     url = vars(args)["index_file"]
-    print("URL of the index file: %s" % url) # print the url
+    print("URL of the index file: %s" % url)  # print the url
     HOST, PATH = url.split("/", 1)  # use urllib.parse for better parsing
     PATH = "/" + PATH
     credentials = str(
         base64.b64encode(
             bytes(vars(args)["username:password"],
-            encoding="ascii")
+                  encoding="ascii")
         ),
         encoding="ascii"
     )
